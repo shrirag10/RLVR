@@ -11,6 +11,9 @@ build/
 venv/
 .venv/
 env/
+# Allow src/env/ (game env source code) — overrides the env/ rule above
+!src/env/
+!src/env/**
 
 # IDE
 .vscode/

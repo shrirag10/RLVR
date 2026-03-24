@@ -19,6 +19,7 @@ from tqdm import tqdm
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 from src.env.gym_wrapper import Gym2048Env
@@ -139,6 +140,7 @@ def train_ppo(
     gamma: float = 0.99,
     clip_range: float = 0.2,
     device: str = "auto",
+    n_envs: int = 1,
 ) -> PPO:
     """
     Train a PPO agent on 2048 using Stable-Baselines3.
@@ -148,8 +150,13 @@ def train_ppo(
     """
     os.makedirs(log_dir, exist_ok=True)
 
-    # Create environment
-    env = Gym2048Env(reward_mode=reward_mode, seed=seed)
+    # Create (optionally vectorized) environment
+    env = make_vec_env(
+        Gym2048Env,
+        n_envs=n_envs,
+        seed=seed,
+        env_kwargs={"reward_mode": reward_mode},
+    )
 
     # Custom policy kwargs
     policy_kwargs = {
@@ -185,7 +192,7 @@ def train_ppo(
 
     print(f"╔══════════════════════════════════════════╗")
     print(f"║  PPO Training — {total_steps:,} steps              ║")
-    print(f"║  Device: {model.device}                          ║")
+    print(f"║  Device: {model.device}  n_envs: {n_envs}              ║")
     print(f"║  Reward: {reward_mode}                    ║")
     print(f"╚══════════════════════════════════════════╝")
 
@@ -208,7 +215,7 @@ def train_ppo(
     # Final save
     model.save(os.path.join(log_dir, "ppo_final"))
     logger.plot_training_curves()
-    env.close()
+    env.close()  # closes all sub-envs if VecEnv
 
     print(f"\n{'='*50}")
     print("Training complete!")

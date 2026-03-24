@@ -23,6 +23,7 @@ from tqdm import tqdm
 
 from stable_baselines3 import A2C
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 from src.env.gym_wrapper import Gym2048Env
@@ -136,6 +137,7 @@ def train_a2c(
     vf_coef: float = 0.5,
     max_grad_norm: float = 0.5,
     device: str = "auto",
+    n_envs: int = 1,
 ) -> A2C:
     """
     Train an A2C agent on 2048 using Stable-Baselines3.
@@ -145,7 +147,12 @@ def train_a2c(
     """
     os.makedirs(log_dir, exist_ok=True)
 
-    env = Gym2048Env(reward_mode=reward_mode, seed=seed)
+    env = make_vec_env(
+        Gym2048Env,
+        n_envs=n_envs,
+        seed=seed,
+        env_kwargs={"reward_mode": reward_mode},
+    )
 
     policy_kwargs = {
         "features_extractor_class": Game2048CNN,
@@ -178,7 +185,7 @@ def train_a2c(
 
     print(f"╔══════════════════════════════════════════╗")
     print(f"║  A2C Training — {total_steps:,} steps              ║")
-    print(f"║  Device: {model.device}                          ║")
+    print(f"║  Device: {model.device}  n_envs: {n_envs}              ║")
     print(f"║  Reward: {reward_mode}                    ║")
     print(f"╚══════════════════════════════════════════╝")
 
@@ -198,7 +205,7 @@ def train_a2c(
 
     model.save(os.path.join(log_dir, "a2c_final"))
     logger.plot_training_curves()
-    env.close()
+    env.close()  # closes all sub-envs if VecEnv
 
     print(f"\n{'='*50}")
     print("Training complete!")

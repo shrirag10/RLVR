@@ -141,7 +141,7 @@ class DiscreteSACAgent:
         buffer_size: int = 100_000,
         batch_size: int = 64,
         learning_starts: int = 5000,
-        target_entropy_ratio: float = 0.5,
+        target_entropy_ratio: float = 0.3,  # lowered: 0.5 caused alpha divergence on 2048
         device: str = "auto",
     ):
         if device == "auto":
@@ -158,10 +158,15 @@ class DiscreteSACAgent:
         self.target = DiscreteSACNetwork().to(self.device)
         self.target.load_state_dict(self.online.state_dict())
 
-        # Optimizers
-        self.actor_optimizer = Adam(
+        # Separate optimizers: backbone+fc shared, actor head, critic heads
+        # FIX: do NOT include backbone in actor optimizer alone — share it via
+        # a single shared_optimizer so it isn't updated twice per step.
+        self.shared_optimizer = Adam(
             list(self.online.backbone.parameters()) +
-            list(self.online.fc.parameters()) +
+            list(self.online.fc.parameters()),
+            lr=lr,
+        )
+        self.actor_optimizer = Adam(
             list(self.online.actor.parameters()),
             lr=lr,
         )
@@ -174,8 +179,13 @@ class DiscreteSACAgent:
         # Automatic entropy tuning
         n_actions = 4
         self.target_entropy = -np.log(1.0 / n_actions) * target_entropy_ratio
-        self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
-        self.alpha_optimizer = Adam([self.log_alpha], lr=lr)
+        # FIX: initialise log_alpha to log(0.1) ≈ -2.3 instead of 0 (=1.0),
+        # and clamp after every update to prevent exponential explosion.
+        self.log_alpha = torch.tensor([np.log(0.1)], requires_grad=True,
+                                      dtype=torch.float32, device=self.device)
+        self.alpha_optimizer = Adam([self.log_alpha], lr=lr * 0.1)  # slower alpha LR
+        self.LOG_ALPHA_MIN = -10.0   # alpha ≥ exp(-10) ≈ 4.5e-5
+        self.LOG_ALPHA_MAX =  2.0    # alpha ≤ exp(2)  ≈ 7.4
 
         # Replay buffer
         self.buffer = ReplayBuffer(buffer_size)
@@ -201,6 +211,12 @@ class DiscreteSACAgent:
                     mask[a] = 1.0
                 action_probs = action_probs * mask
                 action_probs = action_probs / (action_probs.sum() + 1e-8)
+
+            # NaN guard: fall back to uniform over valid actions if probs are bad
+            if torch.isnan(action_probs).any() or action_probs.sum() < 1e-6:
+                if valid_actions:
+                    return valid_actions[np.random.randint(len(valid_actions))]
+                return np.random.randint(4)
 
             if deterministic:
                 action = action_probs.argmax(dim=-1).item()
@@ -253,8 +269,15 @@ class DiscreteSACAgent:
         # Actor loss: minimize α*H - Q
         actor_loss = (action_probs * (alpha * log_probs - q_min)).sum(dim=-1).mean()
 
+        self.shared_optimizer.zero_grad()
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
+        torch.nn.utils.clip_grad_norm_(
+            list(self.online.backbone.parameters()) +
+            list(self.online.fc.parameters()) +
+            list(self.online.actor.parameters()), 1.0
+        )
+        self.shared_optimizer.step()
         self.actor_optimizer.step()
 
         # ─── Alpha (Temperature) Update ───────────────────────
@@ -264,6 +287,10 @@ class DiscreteSACAgent:
         self.alpha_optimizer.zero_grad()
         alpha_loss.backward()
         self.alpha_optimizer.step()
+
+        # FIX: clamp log_alpha to prevent exponential divergence to NaN
+        with torch.no_grad():
+            self.log_alpha.clamp_(self.LOG_ALPHA_MIN, self.LOG_ALPHA_MAX)
 
         # ─── Soft Target Update ───────────────────────────────
         for param, target_param in zip(self.online.parameters(), self.target.parameters()):

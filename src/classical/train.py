@@ -168,6 +168,10 @@ def main():
     train_p.add_argument("--seed", type=int, default=42)
     train_p.add_argument("--log-dir", default="logs")
     train_p.add_argument("--lr", type=float, default=None)
+    train_p.add_argument(
+        "--n-envs", type=int, default=1,
+        help="Number of parallel envs for PPO/A2C (VecEnv). Default: 1.",
+    )
 
     # Eval command
     eval_p = sub.add_parser("eval", help="Evaluate a trained agent")
@@ -206,6 +210,7 @@ def main():
                 log_dir=log_dir,
                 reward_mode=args.reward,
                 seed=args.seed,
+                n_envs=args.n_envs,
                 **kwargs,
             )
         elif args.agent == "a2c":
@@ -218,6 +223,7 @@ def main():
                 log_dir=log_dir,
                 reward_mode=args.reward,
                 seed=args.seed,
+                n_envs=args.n_envs,
                 **kwargs,
             )
         elif args.agent == "qrdqn":
