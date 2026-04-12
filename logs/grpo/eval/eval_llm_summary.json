@@ -1,0 +1,15 @@
+{
+  "n_episodes": 20,
+  "avg_score": 241.0,
+  "max_score": 648.0,
+  "std_score": 137.1823603820841,
+  "avg_max_tile": 23.6,
+  "max_tile_ever": 64,
+  "avg_moves": 76.3,
+  "win_rate_2048": 0.0,
+  "reach_1024": 0.0,
+  "reach_512": 0.0,
+  "mode": "llm",
+  "num_games": 20,
+  "total_time_seconds": 7410.506192684174
+}

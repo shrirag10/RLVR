@@ -26,7 +26,6 @@ env/
 
 # Training artifacts
 checkpoints/
-logs/
 runs/
 wandb/
 outputs/
@@ -36,9 +35,35 @@ outputs/
 *.safetensors
 *.gguf
 
+# Ignore all logs by default, but allow metrics + curves
+logs/
+!logs/sac/
+!logs/sac/sac_metrics.csv
+!logs/sac/sac_curves.png
+!logs/sac_5m/
+!logs/sac_5m/sac_metrics.csv
+!logs/sac_5m/sac_curves.png
+!logs/qrdqn/
+!logs/qrdqn/qrdqn_metrics.csv
+!logs/qrdqn/qrdqn_curves.png
+!logs/qrdqn_5m/
+!logs/qrdqn_5m/qrdqn_metrics.csv
+!logs/qrdqn_5m/qrdqn_curves.png
+!logs/grpo/
+!logs/grpo/eval/
+!logs/grpo/eval/eval_llm_curves.png
+!logs/grpo/eval/eval_llm_metrics.csv
+!logs/grpo/eval/eval_llm_summary.json
+!logs/grpo/eval/sample_responses.json
+
 # Data
 *.csv
 !configs/*.yaml
+!logs/sac/sac_metrics.csv
+!logs/sac_5m/sac_metrics.csv
+!logs/qrdqn/qrdqn_metrics.csv
+!logs/qrdqn_5m/qrdqn_metrics.csv
+!logs/grpo/eval/eval_llm_metrics.csv
 
 # Model weights
 models/
@@ -58,6 +83,5 @@ report/*.blg
 report/*.fdb_latexmk
 report/*.fls
 report/*.synctex.gz
-logs/
 unsloth_compiled_cache/
 __pycache__/
